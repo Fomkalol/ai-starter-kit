@@ -29,9 +29,16 @@ git diff "$MB..HEAD" > "$TMP/diff.patch" || exit 1
 git log --oneline "$MB..HEAD" > "$TMP/commits.txt"
 
 # Базовый клон + подготовка (зависимости); финдерам — дешёвые копии.
+if [ -n "$(git status --porcelain)" ]; then
+  echo "⚠ рабочее дерево грязное: незакоммиченные/untracked правки в ревью НЕ попадут (клоны строятся от HEAD)."
+  echo "  Закоммить (хотя бы WIP) и перезапусти — иначе проверяется не тот код."
+fi
 git clone -q --no-hardlinks "$ROOT" "$TMP/base" || exit 1
 git -C "$TMP/base" checkout -q "$HEAD_SHA"
-if [ -n "${DEEP_SETUP:-}" ]; then (cd "$TMP/base" && sh -c "$DEEP_SETUP" >/dev/null 2>&1); fi
+if [ -n "${DEEP_SETUP:-}" ]; then
+  (cd "$TMP/base" && sh -c "$DEEP_SETUP" >"$TMP/setup.log" 2>&1) || {
+    echo "СТОП: DEEP_SETUP упал; лог:"; tail -10 "$TMP/setup.log"; exit 1; }
+fi
 
 ANGLES_1="Correctness and logic: off-by-one, inverted conditions, wrong defaults, schema/contract mismatches, broken edge cases. Run the unit tests of the project and write your own minimal repro scripts for each suspicion."
 ANGLES_2="Concurrency, resources and lifecycle: races, leaked sockets/files/timers, missing timeouts and cancellation, shutdown ordering, retry storms. Prove hangs/leaks with small runnable repros."
@@ -61,11 +68,26 @@ Rules:
 - Focus on the diff, but follow its consequences anywhere in the repo.
 - Ignore style; report only defects that matter in production.
 - Output format: for each finding a section '### FINDING <n> [P1|P2|P3] <title>' with: Where (file:line), What, Repro (command + output), Fix direction. If nothing found, write 'NO FINDINGS'." >/dev/null 2>&1
-    echo "finder $i done"
+    rc=$?
+    if [ "$rc" -ne 0 ] || [ ! -s "$TMP/finder$i.md" ]; then
+      : > "$TMP/finder$i.failed"; echo "finder $i FAILED (exit $rc)"
+    else
+      echo "finder $i done"
+    fi
   ) &
   i=$((i+1))
 done
 wait
+
+FAILED=$(ls "$TMP"/finder*.failed 2>/dev/null | wc -l | tr -d ' ')
+OKCNT=0
+for f in "$TMP"/finder*.md; do
+  [ -s "$f" ] || continue
+  [ -e "${f%.md}.failed" ] && continue
+  OKCNT=$((OKCNT+1))
+done
+if [ "$OKCNT" -eq 0 ]; then echo "СТОП: ни один финдер не отработал ($FAILED упало) — отчёта не будет"; exit 3; fi
+[ "$FAILED" -gt 0 ] && echo "⚠ упало финдеров: $FAILED из $FINDERS — покрытие неполное (войдёт в шапку отчёта)"
 
 # Скептики: опровергнуть findings соответствующего финдера, тоже запуском.
 i=1
@@ -77,7 +99,12 @@ while [ "$i" -le "$FINDERS" ]; do
       codex exec -C "$TMP/s$i" -s workspace-write -m "$MODEL" -c model_reasoning_effort="$EFFORT" \
         -o "$TMP/skeptic$i.md" \
         "You are an adversarial verifier in a disposable clone with full permission to run code. finder$i.md contains findings from another reviewer about the change in diff.patch (already applied to this checkout). For EACH finding: try to REFUTE it by running the claimed repro yourself and probing the surrounding code. Verdict per finding: CONFIRMED (repro reproduces, impact as claimed), DOWNGRADED (real but lesser severity — explain), or REFUTED (with the run that disproves it). Include commands and outputs. Be strict: a finding whose repro you cannot reproduce is REFUTED." >/dev/null 2>&1
-      echo "skeptic $i done"
+      rc=$?
+      if [ "$rc" -ne 0 ] || [ ! -s "$TMP/skeptic$i.md" ]; then
+        : > "$TMP/skeptic$i.failed"; echo "skeptic $i FAILED (exit $rc)"
+      else
+        echo "skeptic $i done"
+      fi
     ) &
   fi
   i=$((i+1))
@@ -102,6 +129,8 @@ codex exec -C "$SYN" -s read-only --skip-git-repo-check -m "$MODEL" -c model_rea
 {
   echo "# Deep review ($MODEL x$FINDERS finders + skeptics) — $TOPIC"
   echo "base: $BASE_SHA · merge-base: $MB · head: $HEAD_SHA · $(date '+%Y-%m-%d %H:%M')"
+  SFAIL=$(ls "$TMP"/skeptic*.failed 2>/dev/null | wc -l | tr -d ' ')
+  [ "$FAILED" -gt 0 ] || [ "$SFAIL" -gt 0 ] && echo "⚠ ПОКРЫТИЕ НЕПОЛНОЕ: упавших финдеров $FAILED, скептиков $SFAIL — вердикт читать с поправкой."
   echo
   cat "$TMP/final.md"
 } > "$REPORT"

@@ -17,8 +17,17 @@ guard args.count >= 3 else {
 let videoURL = URL(fileURLWithPath: args[1])
 let outDir = URL(fileURLWithPath: args[2], isDirectory: true)
 let fps = args.count >= 4 ? (Double(args[3]) ?? 1.0) : 1.0
+guard fps > 0, fps <= 60, fps.isFinite else {
+    FileHandle.standardError.write("error: fps must be in (0, 60]\n".data(using: .utf8)!)
+    exit(2)
+}
 
-try? FileManager.default.createDirectory(at: outDir, withIntermediateDirectories: true)
+do {
+    try FileManager.default.createDirectory(at: outDir, withIntermediateDirectories: true)
+} catch {
+    FileHandle.standardError.write("error: cannot create \(outDir.path): \(error)\n".data(using: .utf8)!)
+    exit(1)
+}
 
 let asset = AVURLAsset(url: videoURL)
 let gen = AVAssetImageGenerator(asset: asset)
@@ -42,19 +51,24 @@ guard total > 0 else {
 
 let step = 1.0 / fps
 var t = 0.0
-var idx = 1
+var written = 0
+var failed = 0
 while t < total {
     let time = CMTime(seconds: t, preferredTimescale: 600)
+    var ok = false
     if let cg = try? gen.copyCGImage(at: time, actualTime: nil) {
-        let name = String(format: "frame_%04d.png", idx)
-        let dst = CGImageDestinationCreateWithURL(outDir.appendingPathComponent(name) as CFURL,
-                                                  UTType.png.identifier as CFString, 1, nil)
-        if let dst = dst {
+        let name = String(format: "frame_%04d.png", written + 1)
+        if let dst = CGImageDestinationCreateWithURL(outDir.appendingPathComponent(name) as CFURL,
+                                                     UTType.png.identifier as CFString, 1, nil) {
             CGImageDestinationAddImage(dst, cg, nil)
-            CGImageDestinationFinalize(dst)
+            ok = CGImageDestinationFinalize(dst)
         }
     }
-    idx += 1
+    if ok { written += 1 } else { failed += 1 }
     t += step
 }
-print("wrote \(idx - 1) frames to \(outDir.path) (\(fps) fps, \(String(format: "%.1f", total))s video)")
+print("wrote \(written) frames to \(outDir.path) (\(fps) fps, \(String(format: "%.1f", total))s video)")
+if failed > 0 {
+    FileHandle.standardError.write("warning: \(failed) frames failed to extract\n".data(using: .utf8)!)
+    exit(3)
+}

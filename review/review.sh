@@ -38,8 +38,8 @@ fi
 DIFFFILE=$(mktemp); TMP=""
 trap 'rm -f "$DIFFFILE" ${TMP:+"$TMP"}' EXIT
 
-# свои отчёты и сырьё ревью никогда не попадают в дифф и scope
-REVIEW_EXCLUDE="out ${REVIEW_EXCLUDE:-}"
+# свои отчёты, сырьё ревью и типовые секретоносители никогда не попадают в дифф и scope
+REVIEW_EXCLUDE="out .env .env.local .env.production *.pem *.p12 *.p8 *.key id_rsa id_ed25519 ${REVIEW_EXCLUDE:-}"
 # REVIEW_EXCLUDE → pathspec-исключения для git diff и фильтр для untracked
 set --
 for p in ${REVIEW_EXCLUDE:-}; do set -- "$@" ":(exclude)${p%/}" ":(exclude)${p%/}/*"; done
@@ -70,6 +70,21 @@ fi
 if [ ! -s "$DIFFFILE" ] || [ -z "$(tr -d '[:space:]' < "$DIFFFILE")" ]; then
   rm -f "$DIFFFILE"
   echo "ПУСТОЙ ДИФФ ($BASE_SHA...$HEAD_SHA, dirty=$DIRTY) — ревьюить нечего"; exit 2
+fi
+
+# Дифф уходит внешней модели ($TOOL). Показываем, что именно, и сканируем на секреты.
+echo "→ модели $TOOL уходят файлы:"
+grep -E '^(diff --git|\+\+\+ )' "$DIFFFILE" | sed -n 's|^+++ b/|   |p' | sort -u | head -40
+if command -v gitleaks >/dev/null 2>&1; then
+  GL_CFG=""
+  [ -f "$HOME/Claude/claude-home/gitleaks.toml" ] && GL_CFG="-c $HOME/Claude/claude-home/gitleaks.toml"
+  if ! gitleaks detect --no-git --no-banner $GL_CFG --source "$DIFFFILE" >/dev/null 2>&1; then
+    rm -f "$DIFFFILE"
+    echo "СТОП: gitleaks нашёл похожее на секрет в дифф-пакете — наружу не отправляю."
+    echo "Убери секрет из правок (или добавь путь в REVIEW_EXCLUDE) и повтори."; exit 6
+  fi
+else
+  echo "  (gitleaks не установлен — скан на секреты пропущен; brew install gitleaks)"
 fi
 
 mkdir -p out/reports
