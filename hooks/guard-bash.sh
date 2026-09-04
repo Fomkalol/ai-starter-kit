@@ -9,7 +9,7 @@ cmd=$(printf '%s' "$input" | python3 -c "
 import sys, json, re
 d = json.load(sys.stdin)
 c = d.get('tool_input', {}).get('command', '')
-print(re.sub(r\"<<-?\s*['\\\"]?(\w+)['\\\"]?\r?\n.*?^\1[ \t]*\$\", ' <<HEREDOC ', c, flags=re.S | re.M))
+print(re.sub(r\"<<-?\s*['\\\"]?(\w+)['\\\"]?[^\n]*\r?\n.*?^\1[ \t]*\$\", ' <<HEREDOC ', c, flags=re.S | re.M))
 " 2>/dev/null)
 [ -z "$cmd" ] && exit 0
 cmd_flat=$(printf '%s' "$cmd" | tr '\n' ' ')
@@ -20,21 +20,21 @@ deny() {
 }
 
 # heredoc, скармливаемый шеллу: тело не проверяется, поэтому не пропускаем вслепую
-if printf '%s' "$cmd_flat" | grep -Eq '(^|[|;&[:space:]])(sudo[[:space:]]+)?(ba|z)?sh[[:space:]]*<<'; then
+if printf '%s' "$cmd_flat" | grep -Eq '(^|[|;&[:space:]])(sudo[[:space:]]+|env[[:space:]]+)?(/[a-z/]*/)?(ba|z|da)?sh([[:space:]]+-[a-zA-Z]+)*[[:space:]]*<<'; then
   deny "Заблокировано хуком: heredoc, исполняемый шеллом (sh <<EOF) — его тело предохранитель не проверяет. Разверни в явные команды."
 fi
 # рекурсивное удаление корня/домашней папки
-if printf '%s' "$cmd_flat" | grep -Eq 'rm[[:space:]]+((-[a-zA-Z]*[rR][a-zA-Z]*|--recursive)[[:space:]]+)(-[a-zA-Z-]+[[:space:]]+)*[\"'"'"']?(/|~|\$\{?HOME\}?|/\*|\.\.)[\"'"'"']?([[:space:]/]|$)|rm[[:space:]]+[^|;&]*--recursive[^|;&]*[\"'"'"']?(/|~|\$\{?HOME\}?)[\"'"'"']?([[:space:]/]|$)'; then
+if printf '%s' "$cmd_flat" | grep -Eq 'rm[[:space:]]+(-[a-zA-Z-]+[[:space:]]+)*(-[a-zA-Z]*[rR][a-zA-Z]*|--recursive)([[:space:]]+-[a-zA-Z-]+)*[[:space:]]+[\"'"'"']?(/|~|\$\{?HOME\}?|/\*|\.\.)[\"'"'"']?([[:space:]/]|$)'; then
   deny "Заблокировано хуком: рекурсивное удаление корня/домашней папки. Уточни путь."
 fi
 # загрузка скрипта с пайпом в shell (curl|wget … | sh/bash)
-if printf '%s' "$cmd_flat" | grep -Eq '(curl|wget)[^|]*\|[[:space:]]*(sudo[[:space:]]+)?(bash|sh|zsh)'; then
+if printf '%s' "$cmd_flat" | grep -Eq '(curl|wget)[^|]*\|[[:space:]]*(sudo[[:space:]]+|env[[:space:]]+)?(/[a-z/]*/)?(bash|sh|zsh|dash)([[:space:]]|$)'; then
   deny "Заблокировано хуком: запуск скачанного скрипта через | sh. Сохрани и проверь файл сначала."
 fi
 # force-push — по самому флагу, а не по слову main: `git push -f origin HEAD` на выкаченном main
 # затирает чужую работу ровно так же. Смотрим только сегмент самой команды (до | ; &&),
 # чтобы -f из соседних тестов [ -f … ] не срабатывал.
-if printf '%s' "$cmd" | grep -Eq 'git[[:space:]]+push[^|;&]*(--force(-with-lease(=[^[:space:]]+)?)?|-f)([[:space:]]|$)|git[[:space:]]+push[[:space:]][^|;&]*[[:space:]]\+[^[:space:]:]+'; then
+if printf '%s' "$cmd" | grep -Eq 'git([[:space:]]+-[a-zA-Z-]+([[:space:]]+[^[:space:]]+)?)*[[:space:]]+push[^|;&]*(--force(-with-lease(=[^[:space:]]+)?)?|-f)([[:space:]]|$)|git([[:space:]]+-[a-zA-Z-]+([[:space:]]+[^[:space:]]+)?)*[[:space:]]+push[[:space:]][^|;&]*[[:space:]]\+[^[:space:]:]+'; then
   deny "Заблокировано хуком: force-push. Перезаписывает чужие коммиты; если это точно нужно — сделай сам в терминале."
 fi
 # разрушающий git: стирает незакоммиченную работу без спроса
@@ -42,7 +42,7 @@ if printf '%s' "$cmd" | grep -Eq 'git[[:space:]]+(reset[^|;&]*--hard|clean[[:spa
   deny "Заблокировано хуком: разрушающая git-команда (reset --hard / clean -f / checkout . / branch -D) — стирает незакоммиченную работу. Сохрани WIP-коммитом или уточни путь."
 fi
 # rsync --delete в сторону удалённого хоста / rm -rf по ssh: снос прод-данных одной строкой (инцидент 29.07)
-if printf '%s' "$cmd_flat" | grep -Eq 'rsync[^|;&]*--delete[^|;&]*[[:space:]][^[:space:]]+@[^[:space:]]+:|rsync[^|;&]*[[:space:]][^[:space:]]+@[^[:space:]]+:[^|;&]*--delete|ssh[^|;&]*[[:space:]]rm[[:space:]]+-[a-zA-Z]*[rR]'; then
+if printf '%s' "$cmd_flat" | grep -Eq 'rsync[^|;&]*--delete[^|;&]*[[:space:]][^[:space:]/]+:|rsync[^|;&]*[[:space:]][^[:space:]/]+:[^|;&]*--delete|ssh[^|;&]*[[:space:]\"'"'"']rm[[:space:]]+(-[a-zA-Z-]+[[:space:]]+)*(-[a-zA-Z]*[rR]|--recursive)'; then
   deny "Заблокировано хуком: rsync --delete или rm -r на удалённом хосте — так сносят прод-данные одной строкой. Сделай руками с бэкапом."
 fi
 # затирание диска / форматирование
