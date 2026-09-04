@@ -22,14 +22,16 @@ cd ~/ai-starter-kit && sh setup.sh
 
 ```text
 Поставь мне рабочий стек для Claude Code по стартер-киту https://github.com/Fomkalol/ai-starter-kit
-(гайд команды: https://ai-guide.stepamobile.com/, вкладка «Разработчик»). Сделай по шагам:
+(гайд команды: https://ai-guide.stepamobile.com/, вкладка «Разработчик»). По шагам:
 1) склонируй кит в ~/ai-starter-kit и прочитай README;
-2) запусти установку без вопросов: KIT_POST_HOOKS=y KIT_SUPERPOWERS=y KIT_MARKETINGSKILLS=n sh setup.sh;
-3) проверь Codex CLI для кросс-ревью (codex --version); нет — npm i -g @openai/codex;
-4) заполни ~/.claude/CLAUDE.md по шаблону rules/CLAUDE.global.md — спроси меня, чем я занимаюсь и на каком стеке;
-5) в текущем репозитории создай CLAUDE.md по rules/CLAUDE.project.md;
-6) сверь результат с чек-листом «Разработчик» из гайда и скажи, чего не хватает.
-Объясняй по ходу, что делаешь и зачем. Перезапуск Claude Code в конце — напомни.
+2) покажи мне, что будет установлено и какие файлы на моём компьютере изменятся, и дождись моего «ок»;
+3) после «ок» запусти установку без вопросов: KIT_POST_HOOKS=y KIT_SUPERPOWERS=y KIT_MARKETINGSKILLS=n sh setup.sh —
+   существующие файлы не перезаписывай без подтверждения;
+4) проверь Codex CLI для кросс-ревью (codex --version); нет — npm i -g @openai/codex;
+5) заполни ~/.claude/CLAUDE.md по шаблону rules/CLAUDE.global.md — спроси меня, чем я занимаюсь и на каком стеке;
+6) в текущем репозитории создай CLAUDE.md по rules/CLAUDE.project.md;
+7) сверь результат с чек-листом «Разработчик» из гайда и скажи, чего не хватает.
+Объясняй по ходу, что делаешь и зачем. В конце напомни перезапустить Claude Code.
 ```
 
 Переменные `KIT_*` (y/n) отвечают на вопросы установщика вместо клавиатуры — так его можно
