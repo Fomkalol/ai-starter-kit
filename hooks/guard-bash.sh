@@ -41,6 +41,10 @@ fi
 if printf '%s' "$cmd" | grep -Eq 'git[[:space:]]+(reset[^|;&]*--hard|clean[[:space:]]+-[a-zA-Z]*f|checkout[[:space:]]+(--[[:space:]]+)?\.([[:space:]]|$)|restore[[:space:]]+(--[a-zA-Z-]+[[:space:]]+)*\.([[:space:]]|$)|branch[^|;&]*-D([[:space:]]|$))'; then
   deny "Заблокировано хуком: разрушающая git-команда (reset --hard / clean -f / checkout . / branch -D) — стирает незакоммиченную работу. Сохрани WIP-коммитом или уточни путь."
 fi
+# rsync --delete в сторону удалённого хоста / rm -rf по ssh: снос прод-данных одной строкой (инцидент 29.07)
+if printf '%s' "$cmd_flat" | grep -Eq 'rsync[^|;&]*--delete[^|;&]*[[:space:]][^[:space:]]+@[^[:space:]]+:|rsync[^|;&]*[[:space:]][^[:space:]]+@[^[:space:]]+:[^|;&]*--delete|ssh[^|;&]*[[:space:]]rm[[:space:]]+-[a-zA-Z]*[rR]'; then
+  deny "Заблокировано хуком: rsync --delete или rm -r на удалённом хосте — так сносят прод-данные одной строкой. Сделай руками с бэкапом."
+fi
 # затирание диска / форматирование
 if printf '%s' "$cmd" | grep -Eq '(^|[[:space:]])(mkfs|dd[[:space:]]+if=.*of=/dev/)'; then
   deny "Заблокировано хуком: операция с дисковым устройством."
