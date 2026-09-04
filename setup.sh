@@ -22,8 +22,11 @@ say "✓ хуки скопированы в ~/.claude/hooks/"
 
 # PostToolUse-хуки (автоформат и проверка типов) запускают prettier/tsc ИЗ ОТКРЫТОГО ПРОЕКТА.
 # В недоверенном репозитории это исполнение чужого кода — поэтому ставим только по согласию.
-printf "Включить автоформат и проверку типов после правок (запускают prettier/tsc текущего проекта; в чужих репо = исполнение их кода)? [y/N] "
-read -r hooks_ans || hooks_ans=n
+# Неинтерактивно (из Claude Code): KIT_POST_HOOKS=y|n KIT_SUPERPOWERS=y|n KIT_MARKETINGSKILLS=y|n sh setup.sh
+if [ -n "${KIT_POST_HOOKS:-}" ]; then hooks_ans="$KIT_POST_HOOKS"; else
+  printf "Включить автоформат и проверку типов после правок (запускают prettier/tsc текущего проекта; в чужих репо = исполнение их кода)? [y/N] "
+  read -r hooks_ans || hooks_ans=n
+fi
 
 # 2. Хуки в settings.json (аккуратный merge с бэкапом)
 INSTALL_POST="$hooks_ans" STAMP="$STAMP" python3 - "$HOME/.claude/settings.json" <<'PY'
@@ -112,8 +115,10 @@ else
 fi
 
 # 6. Опционально: superpowers + marketingskills
-printf "Поставить superpowers (методология для кодинг-агента)? [y/N] "
-read -r ans || ans=n
+if [ -n "${KIT_SUPERPOWERS:-}" ]; then ans="$KIT_SUPERPOWERS"; else
+  printf "Поставить superpowers (методология для кодинг-агента)? [y/N] "
+  read -r ans || ans=n
+fi
 if [ "$ans" = "y" ] || [ "$ans" = "Y" ]; then
   mkdir -p "$HOME/.claude/skill-repos"
   [ -d "$HOME/.claude/skill-repos/superpowers" ] || git clone https://github.com/obra/superpowers "$HOME/.claude/skill-repos/superpowers"
@@ -123,8 +128,10 @@ if [ "$ans" = "y" ] || [ "$ans" = "Y" ]; then
   done
   say "✓ superpowers установлен"
 fi
-printf "Поставить marketingskills (маркетинг/ASO/тексты)? [y/N] "
-read -r ans || ans=n
+if [ -n "${KIT_MARKETINGSKILLS:-}" ]; then ans="$KIT_MARKETINGSKILLS"; else
+  printf "Поставить marketingskills (маркетинг/ASO/тексты)? [y/N] "
+  read -r ans || ans=n
+fi
 if [ "$ans" = "y" ] || [ "$ans" = "Y" ]; then
   mkdir -p "$HOME/.claude/skill-repos"
   [ -d "$HOME/.claude/skill-repos/marketingskills" ] || git clone https://github.com/coreyhaines31/marketingskills "$HOME/.claude/skill-repos/marketingskills"
