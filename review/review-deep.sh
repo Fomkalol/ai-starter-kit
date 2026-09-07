@@ -7,7 +7,7 @@
 #
 # Использование: из корня код-репо
 #   sh review-deep.sh [база=main] [тема=deep]
-# Опционально: DEEP_FINDERS=6 (число финдеров), DEEP_MODEL=gpt-5.6-sol,
+# Опционально: DEEP_FINDERS=6 (число финдеров; в проекте с платёжным кодом автоматически 7 — угол «Payments»), DEEP_MODEL=gpt-5.6-sol,
 #   DEEP_EFFORT=high, DEEP_SETUP="npm ci --omit=dev" (команда подготовки клона).
 # Отчёт: out/reports/deep_review_<тема>_<head>.md (появляется только при успехе).
 set -u
@@ -35,6 +35,12 @@ if [ -n "$(git status --porcelain)" ]; then
 fi
 git clone -q --no-hardlinks "$ROOT" "$TMP/base" || exit 1
 git -C "$TMP/base" checkout -q "$HEAD_SHA"
+# Проект с покупками/подписками → дополнительный финдер «Payments» (общие углы их не ловят).
+PAY_MARKERS='StoreKit|SKPaymentQueue|Product\.purchase|BillingClient|RevenueCat|react-native-purchases|Purchases\.(configure|purchase|getOfferings)|AdaptySDK|import Adapty|react-native-adapty|adapty\.(activate|makePurchase|getPaywall|restorePurchases)|verifyReceipt|AppStoreServer|signedTransaction|Stripe\(|stripe\.(checkout|webhooks|subscriptions|customers|paymentIntents)|from .stripe|require\(.stripe|import stripe|checkout\.session'
+if git -C "$TMP/base" grep -q -I -i -E "$PAY_MARKERS" -- . ':(exclude)*.lock' ':(exclude)*lock.json' ':(exclude)*.md' ':(exclude)*.css' 2>/dev/null; then
+  [ "$FINDERS" -lt 7 ] && FINDERS=7; PAY=1
+  echo "финдер 7 «Payments» включён: в проекте найден платёжный код"
+fi
 if [ -n "${DEEP_SETUP:-}" ]; then
   (cd "$TMP/base" && sh -c "$DEEP_SETUP" >"$TMP/setup.log" 2>&1) || {
     echo "СТОП: DEEP_SETUP упал; лог:"; tail -10 "$TMP/setup.log"; exit 1; }
@@ -45,6 +51,7 @@ ANGLES_2="Concurrency, resources and lifecycle: races, leaked sockets/files/time
 ANGLES_3="Security and safety filters: adversarial inputs, injection, bypasses of any validation/sanitization in the diff (try many phrasings and encodings BY RUNNING the code), ReDoS (measure with long inputs and a timer), secrets in logs."
 ANGLES_4="Performance: quadratic loops, repeated full-file rewrites, oversized allocations, needless decoding. MEASURE suspicious paths with node/python timers on realistic sizes; report numbers."
 ANGLES_5="Cross-file contracts: trace call chains across files touched by the diff; log-line formats vs their parsers; env var names vs docs; JSON schemas vs consumers; config plumbed end-to-end. Verify by executing the involved functions together."
+ANGLES_7="Payments and subscriptions: review the WHOLE payment module, not just the diff. Verify by running (project tests, StoreKit configuration/testing tools if present, or your own repro scripts): product/Store IDs match the target and store account; purchase, restore and paywall handle every outcome (success, cancel, pending, network error, already owned); premium is granted only on a verified transaction — hunt for backdoors, debug flags, hardcoded overrides; payment SDK versions (StoreKit/Adapty/RevenueCat/Adjust) are current and calls match the current API; init order ATT -> Adjust -> purchase attribution. For web payments (Stripe etc.): webhook signature verified, events idempotent, access granted only on a confirmed payment event, test keys/mode cannot leak into production. State explicitly what cannot be verified without a real store (live purchase, dashboard config)."
 ANGLES_6="Operational failure modes: disk full/read-only/missing dirs, dependency errors, provider HTTP failures, process restart mid-operation, malformed persisted state. Simulate each with fault-injection scripts against the real modules."
 
 i=1
@@ -52,6 +59,7 @@ while [ "$i" -le "$FINDERS" ]; do
   case "$i" in
     1) ANGLE="$ANGLES_1";; 2) ANGLE="$ANGLES_2";; 3) ANGLE="$ANGLES_3";;
     4) ANGLE="$ANGLES_4";; 5) ANGLE="$ANGLES_5";; 6) ANGLE="$ANGLES_6";;
+    7) ANGLE="$ANGLES_7";;
     *) ANGLE="$ANGLES_1";;
   esac
   cp -Rc "$TMP/base" "$TMP/f$i" 2>/dev/null || cp -R "$TMP/base" "$TMP/f$i"
@@ -129,6 +137,7 @@ codex exec -C "$SYN" -s read-only --skip-git-repo-check -m "$MODEL" -c model_rea
 {
   echo "# Deep review ($MODEL x$FINDERS finders + skeptics) — $TOPIC"
   echo "base: $BASE_SHA · merge-base: $MB · head: $HEAD_SHA · $(date '+%Y-%m-%d %H:%M')"
+  [ -n "${PAY:-}" ] && echo "угол «Payments»: включён (в проекте найден платёжный код)"
   SFAIL=$(ls "$TMP"/skeptic*.failed 2>/dev/null | wc -l | tr -d ' ')
   [ "$FAILED" -gt 0 ] || [ "$SFAIL" -gt 0 ] && echo "⚠ ПОКРЫТИЕ НЕПОЛНОЕ: упавших финдеров $FAILED, скептиков $SFAIL — вердикт читать с поправкой."
   echo
