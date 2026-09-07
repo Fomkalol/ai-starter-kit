@@ -36,7 +36,7 @@ fi
 git clone -q --no-hardlinks "$ROOT" "$TMP/base" || exit 1
 git -C "$TMP/base" checkout -q "$HEAD_SHA"
 # Проект с покупками/подписками → дополнительный финдер «Payments» (общие углы их не ловят).
-PAY_MARKERS='StoreKit|SKPaymentQueue|Product\.purchase|BillingClient|RevenueCat|react-native-purchases|Purchases\.(configure|purchase|getOfferings)|AdaptySDK|import Adapty|react-native-adapty|adapty\.(activate|makePurchase|getPaywall|restorePurchases)|verifyReceipt|AppStoreServer|signedTransaction|Stripe\(|stripe\.(checkout|webhooks|subscriptions|customers|paymentIntents)|Stripe::|\\Stripe\\|stripe/stripe-|from .stripe|require\(.stripe|require .stripe|import stripe|checkout\.session'
+PAY_MARKERS='StoreKit|SKPaymentQueue|Product\.purchase|BillingClient|RevenueCat|react-native-purchases|Purchases\.(configure|purchase|getOfferings)|AdaptySDK|import Adapty|react-native-adapty|adapty_flutter|Adapty\(\)|react-native-iap|expo-iap|adapty\.(activate|makePurchase|getPaywall|restorePurchases)|verifyReceipt|AppStoreServer|signedTransaction|Stripe\(|stripe\.(checkout|webhooks|subscriptions|customers|paymentIntents)|Stripe::|\\Stripe\\|stripe/stripe-|from .stripe|require\(.stripe|require .stripe|import stripe|checkout\.session'
 if git -C "$TMP/base" grep -q -I -i -E "$PAY_MARKERS" -- . ':(exclude)*.lock' ':(exclude)*lock.json' ':(exclude)*.md' ':(exclude)*.css' ':(exclude)*review.sh' ':(exclude)*review-deep.sh' 2>/dev/null; then
   [ "$FINDERS" -lt 7 ] && FINDERS=7; PAY=1
   echo "финдер 7 «Payments» включён: в проекте найден платёжный код"
