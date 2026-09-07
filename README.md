@@ -79,6 +79,12 @@ cd ~/ai-starter-kit && sh setup.sh
 (onboarding, paywalls) он делает урезанный аудит — ставь их через setup.sh. `product-research`
 аналогично использует competitor-profiling / aso / marketing-psychology из marketingskills.
 
+## Обратная связь
+
+Поработал пару дней — скажи Claude `/kit-feedback`: он проверит, что реально поставилось, задаст
+четыре вопроса и соберёт файл для владельца кита. Через 2 недели можно повторить паспорт сетапа
+(промпт у владельца) — разница «до/после» покажет, что изменилось на деле.
+
 ## Требования
 
 macOS/Linux, git, python3. Для хуков автоформата — prettier/gofmt в проектах (не обязательно).

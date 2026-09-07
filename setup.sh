@@ -149,3 +149,4 @@ say "   (для Codex тот же текст в ~/.codex/AGENTS.md). В код-�
 say "2. MCP context7/playwright: сниппеты в mcp/README.md."
 say "3. Кросс-ревью: из корня код-репо  sh $KIT/review/review.sh codex"
 say "4. Перезапусти Claude Code, чтобы подхватились хуки и скилы."
+say "5. Через пару дней работы скажи Claude: /kit-feedback — он соберёт, что сошлось и что нет; файл скинь владельцу кита."
