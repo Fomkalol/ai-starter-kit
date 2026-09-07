@@ -80,10 +80,22 @@ for s in "$KIT"/skills/*/; do
 done
 for c in "$KIT"/commands/*.md; do
   name=$(basename "$c")
-  [ -e "$HOME/.claude/commands/$name" ] && { say "  команда $name уже есть — пропускаю"; continue; }
-  cp "$c" "$HOME/.claude/commands/$name"
-  say "✓ команда /$( basename "$name" .md ) установлена"
+  dst="$HOME/.claude/commands/$name"
+  if [ ! -e "$dst" ]; then
+    cp "$c" "$dst"; say "✓ команда /$(basename "$name" .md) установлена (Claude Code)"
+  elif ! cmp -s "$c" "$dst"; then
+    cp "$dst" "$dst.$STAMP.bak"; cp "$c" "$dst"; say "✓ команда /$(basename "$name" .md) обновлена (старая — $name.$STAMP.bak)"
+  fi
 done
+# Те же команды — в Codex как кастомные промпты (~/.codex/prompts/<имя>.md → /<имя>)
+if [ -d "$HOME/.codex" ]; then
+  mkdir -p "$HOME/.codex/prompts"
+  for c in "$KIT"/commands/*.md; do
+    name=$(basename "$c"); dst="$HOME/.codex/prompts/$name"
+    if [ ! -e "$dst" ] || ! cmp -s "$c" "$dst"; then cp "$c" "$dst"; fi
+  done
+  say "✓ команды продублированы в ~/.codex/prompts/ (Codex: /kit-feedback, /handoff, /learn, /risks)"
+fi
 
 # 4. Секреты
 if [ ! -d "$HOME/.secrets" ]; then

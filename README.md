@@ -79,6 +79,11 @@ cd ~/ai-starter-kit && sh setup.sh
 (onboarding, paywalls) он делает урезанный аудит — ставь их через setup.sh. `product-research`
 аналогично использует competitor-profiling / aso / marketing-psychology из marketingskills.
 
+## Обновление кита
+
+Скажи своему Claude (или Codex): «обнови стартер-кит» — он сделает `cd ~/ai-starter-kit && git pull && sh setup.sh`.
+Установщик повторяемый: новые команды и хуки доедут, твои файлы не тронет (старые версии — в `.bak`).
+
 ## Обратная связь
 
 Поработал пару дней — скажи Claude `/kit-feedback`: он проверит, что реально поставилось, задаст
