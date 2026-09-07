@@ -36,8 +36,9 @@ fi
 git clone -q --no-hardlinks "$ROOT" "$TMP/base" || exit 1
 git -C "$TMP/base" checkout -q "$HEAD_SHA"
 # Проект с покупками/подписками → дополнительный финдер «Payments» (общие углы их не ловят).
-PAY_MARKERS='StoreKit|SKPaymentQueue|Product\.purchase|BillingClient|RevenueCat|react-native-purchases|Purchases\.(configure|purchase|getOfferings)|AdaptySDK|import Adapty|react-native-adapty|adapty_flutter|Adapty\(\)|react-native-iap|expo-iap|adapty\.(activate|makePurchase|getPaywall|restorePurchases)|verifyReceipt|AppStoreServer|signedTransaction|Stripe\(|stripe\.(checkout|webhooks|subscriptions|customers|paymentIntents)|Stripe::|\\Stripe\\|stripe/stripe-|from .stripe|require\(.stripe|require .stripe|import stripe|checkout\.session'
-if git -C "$TMP/base" grep -q -I -i -E "$PAY_MARKERS" -- . ':(exclude)*.lock' ':(exclude)*lock.json' ':(exclude)*.md' ':(exclude)*.css' ':(exclude)*review.sh' ':(exclude)*review-deep.sh' 2>/dev/null; then
+PAY_MARKERS='StoreKit|SKPaymentQueue|Product\.purchase|BillingClient|RevenueCat|react-native-purchases|Purchases\.(configure|purchase|getOfferings)|AdaptySDK|import Adapty|react-native-adapty|adapty_flutter|Adapty\(\)|react-native-iap|expo-iap|adapty\.(activate|makePurchase|getPaywall|restorePurchases)|verifyReceipt|AppStoreServer|signedTransaction|Stripe\(|stripe\.(checkout|webhooks|subscriptions|customers|paymentIntents)|Stripe::|\\Stripe\\|stripe/stripe-|from .stripe|require\(.stripe|require .stripe|import stripe|in_app_purchase|com\.stripe|using Stripe|checkout\.session'
+# REVIEW_PAY=1 — включить финдер принудительно (SDK не из списка), REVIEW_PAY=0 — выключить.
+if [ "${REVIEW_PAY:-}" = 1 ] || { [ "${REVIEW_PAY:-}" != 0 ] && git -C "$TMP/base" grep -q -I -i -E "$PAY_MARKERS" -- . ':(exclude)*.lock' ':(exclude)*lock.json' ':(exclude)*.md' ':(exclude)*.css' ':(exclude)*review.sh' ':(exclude)*review-deep.sh' 2>/dev/null; }; then
   [ "$FINDERS" -lt 7 ] && FINDERS=7; PAY=1
   echo "финдер 7 «Payments» включён: в проекте найден платёжный код"
   PAY_SYN=" The project contains payment code: ALWAYS include a section 'Оплата' — confirmed payment findings (if any), and the list of what could NOT be verified without a real store (from finder7.md), even when finder7 reported NO FINDINGS."
