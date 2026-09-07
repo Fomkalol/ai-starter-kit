@@ -61,7 +61,7 @@ while [ "$i" -le "$FINDERS" ]; do
   case "$i" in
     1) ANGLE="$ANGLES_1";; 2) ANGLE="$ANGLES_2";; 3) ANGLE="$ANGLES_3";;
     4) ANGLE="$ANGLES_4";; 5) ANGLE="$ANGLES_5";; 6) ANGLE="$ANGLES_6";;
-    7) ANGLE="$ANGLES_7";;
+    7) if [ -n "${PAY:-}" ]; then ANGLE="$ANGLES_7"; else ANGLE="$ANGLES_1"; fi;;
     *) ANGLE="$ANGLES_1";;
   esac
   cp -Rc "$TMP/base" "$TMP/f$i" 2>/dev/null || cp -R "$TMP/base" "$TMP/f$i"
