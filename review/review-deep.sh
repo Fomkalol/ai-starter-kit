@@ -36,10 +36,11 @@ fi
 git clone -q --no-hardlinks "$ROOT" "$TMP/base" || exit 1
 git -C "$TMP/base" checkout -q "$HEAD_SHA"
 # Проект с покупками/подписками → дополнительный финдер «Payments» (общие углы их не ловят).
-PAY_MARKERS='StoreKit|SKPaymentQueue|Product\.purchase|BillingClient|RevenueCat|react-native-purchases|Purchases\.(configure|purchase|getOfferings)|AdaptySDK|import Adapty|react-native-adapty|adapty\.(activate|makePurchase|getPaywall|restorePurchases)|verifyReceipt|AppStoreServer|signedTransaction|Stripe\(|stripe\.(checkout|webhooks|subscriptions|customers|paymentIntents)|from .stripe|require\(.stripe|import stripe|checkout\.session'
-if git -C "$TMP/base" grep -q -I -i -E "$PAY_MARKERS" -- . ':(exclude)*.lock' ':(exclude)*lock.json' ':(exclude)*.md' ':(exclude)*.css' 2>/dev/null; then
+PAY_MARKERS='StoreKit|SKPaymentQueue|Product\.purchase|BillingClient|RevenueCat|react-native-purchases|Purchases\.(configure|purchase|getOfferings)|AdaptySDK|import Adapty|react-native-adapty|adapty\.(activate|makePurchase|getPaywall|restorePurchases)|verifyReceipt|AppStoreServer|signedTransaction|Stripe\(|stripe\.(checkout|webhooks|subscriptions|customers|paymentIntents)|Stripe::|\\Stripe\\|stripe/stripe-|from .stripe|require\(.stripe|require .stripe|import stripe|checkout\.session'
+if git -C "$TMP/base" grep -q -I -i -E "$PAY_MARKERS" -- . ':(exclude)*.lock' ':(exclude)*lock.json' ':(exclude)*.md' ':(exclude)*.css' ':(exclude)*review.sh' ':(exclude)*review-deep.sh' 2>/dev/null; then
   [ "$FINDERS" -lt 7 ] && FINDERS=7; PAY=1
   echo "финдер 7 «Payments» включён: в проекте найден платёжный код"
+  PAY_SYN=" The project contains payment code: ALWAYS include a section 'Оплата' — confirmed payment findings (if any), and the list of what could NOT be verified without a real store (from finder7.md), even when finder7 reported NO FINDINGS."
 fi
 if [ -n "${DEEP_SETUP:-}" ]; then
   (cd "$TMP/base" && sh -c "$DEEP_SETUP" >"$TMP/setup.log" 2>&1) || {
@@ -126,7 +127,7 @@ cp "$TMP/diff.patch" "$SYN/"
 # без флага codex отказывается работать. </dev/null: иначе он ждёт ввода со stdin.
 # Вывод больше не глушим целиком — при падении причина должна быть видна.
 codex exec -C "$SYN" -s read-only --skip-git-repo-check -m "$MODEL" -c model_reasoning_effort="$EFFORT" -o "$TMP/final.md" \
-  "Combine the reviewer reports (finder*.md) with the adversarial verdicts (skeptic*.md) into ONE final review of diff.patch, in Russian. Include only findings CONFIRMED or DOWNGRADED by the skeptics (drop REFUTED, but list them briefly in an 'Опровергнуто' section with one line why). Deduplicate. Sort by severity (P1/P2/P3). For each: Где, Что, Воспроизведение (команда+вывод), Как чинить. End with a verdict: можно ли мержить." </dev/null >"$TMP/syn.log" 2>&1
+  "Combine the reviewer reports (finder*.md) with the adversarial verdicts (skeptic*.md) into ONE final review of diff.patch, in Russian. Include only findings CONFIRMED or DOWNGRADED by the skeptics (drop REFUTED, but list them briefly in an 'Опровергнуто' section with one line why). Deduplicate. Sort by severity (P1/P2/P3). For each: Где, Что, Воспроизведение (команда+вывод), Как чинить. End with a verdict: можно ли мержить.${PAY_SYN:-}" </dev/null >"$TMP/syn.log" 2>&1
 
 [ -s "$TMP/final.md" ] || {
   echo "синтез не удался; причина:"; tail -5 "$TMP/syn.log" 2>/dev/null
