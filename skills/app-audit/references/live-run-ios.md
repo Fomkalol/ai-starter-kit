@@ -65,8 +65,7 @@ Timebox: 20 минут на зависимости + сборку. Failure за�
 
 ```bash
 git clone <git-user>@<git-host>:<repo-path>/<slug>.git <scratchpad>/<app>
-# slug не найден:
-ssh <git-user>@<git-host> ls <repo-path>/
+# slug не найден — список репо из git-хостинга команды (API или ls по SSH)
 
 cd <scratchpad>/<app>
 WS=$(ls -d *.xcworkspace 2>/dev/null | head -1)
