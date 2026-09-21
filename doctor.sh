@@ -15,8 +15,8 @@ H="$HOME/.claude/hooks/guard-bash.sh"
 if [ ! -f "$H" ]; then bad "нет $H — запусти setup.sh"
 elif ! cmp -s "$H" "$KIT/hooks/guard-bash.sh"; then warn "guard-bash.sh отличается от версии кита (обнови: sh setup.sh)"
 else ok "guard-хук на месте и совпадает с китом"; fi
-if python3 -c 'import json,sys,os; d=json.load(open(os.path.expanduser("~/.claude/settings.json"))); sys.exit(0 if any("guard-bash" in h.get("command","") for r in d.get("hooks",{}).get("PreToolUse",[]) for h in r.get("hooks",[])) else 1)' 2>/dev/null
-then ok "хук прописан в settings.json → PreToolUse"; else bad "guard-хук не прописан в ~/.claude/settings.json (или JSON битый)"; fi
+if python3 -c 'import json,sys,os; d=json.load(open(os.path.expanduser("~/.claude/settings.json"))); sys.exit(0 if any(r.get("matcher","") in ("Bash","*","") or "Bash" in r.get("matcher","").split("|") for r in d.get("hooks",{}).get("PreToolUse",[]) for h in r.get("hooks",[]) if h.get("type","command")=="command" and h.get("command","").strip().endswith("guard-bash.sh")) else 1)' 2>/dev/null
+then ok "хук прописан в settings.json → PreToolUse, matcher Bash"; else bad "guard-хук не прописан на Bash в ~/.claude/settings.json (или JSON битый): sh setup.sh"; fi
 # скилы и команды
 for s in "$KIT"/skills/*/; do n=$(basename "$s")
   if [ -f "$HOME/.claude/skills/$n/SKILL.md" ]; then ok "скил $n (Claude)"; else bad "скил $n не читается в ~/.claude/skills (битая ссылка? на Windows — запусти setup.sh ещё раз, он скопирует)"; fi
@@ -37,25 +37,29 @@ command -v codex  >/dev/null 2>&1 && ok "codex в PATH ($(codex --version 2>/dev
 command -v gitleaks >/dev/null 2>&1 && ok "gitleaks есть" || warn "gitleaks нет — review.sh не сканирует дифф на секреты"
 # секреты
 if [ ! -d "$HOME/.secrets" ]; then warn "нет ~/.secrets"
-elif [ "$WIN" = 1 ]; then ok "~/.secrets есть (Windows: права 700 не проверяются, доступ задаётся ACL — папка в профиле пользователя, этого достаточно)"
+elif [ "$WIN" = 1 ]; then warn "~/.secrets есть, но права НЕ проверены: в Windows доступ задаётся ACL. Проверь сам: icacls \"%USERPROFILE%\\.secrets\" — в списке только ты, SYSTEM и Administrators"
 else P=$(stat -f %Lp "$HOME/.secrets" 2>/dev/null || stat -c %a "$HOME/.secrets" 2>/dev/null); [ "$P" = 700 ] && ok "~/.secrets права 700" || warn "~/.secrets права $P, нужно 700: chmod 700 ~/.secrets"; fi
 
 echo "== Использование"
 WS="$HOME/ai-workspace"
 if [ -d "$WS" ]; then
-  grep -q '<задача>\|<дата>' "$WS/TASKS.md" 2>/dev/null && warn "TASKS.md — всё ещё шаблон, задачами не пользуются" || ok "TASKS.md ведётся"
-  N=$(find "$WS/memory" -name '*.md' ! -name MEMORY.md 2>/dev/null | wc -l | tr -d ' '); [ "$N" -gt 0 ] && ok "файлов памяти: $N" || warn "память пустая: агент каждый раз узнаёт проект заново (команда /learn)"
+  if [ ! -s "$WS/TASKS.md" ]; then warn "TASKS.md нет или пустой"
+  elif grep -q '<задача>\|<дата>' "$WS/TASKS.md"; then warn "TASKS.md — всё ещё шаблон, задачами не пользуются"
+  else ok "TASKS.md ведётся"; fi
+  N=$(find "$WS/memory" -name '*.md' ! -name MEMORY.md ! -name '*template*' 2>/dev/null | wc -l | tr -d ' '); [ "$N" -gt 0 ] && ok "файлов памяти: $N" || warn "память пустая: агент каждый раз узнаёт проект заново (команда /learn)"
   N=$(find "$WS/handoffs" -name '*.md' ! -name '*template*' 2>/dev/null | wc -l | tr -d ' '); [ "$N" -gt 0 ] && ok "хендоффов: $N" || warn "хендоффов нет (команда /handoff перед сменой сессии)"
 else warn "нет ~/ai-workspace"; fi
 # репо: CLAUDE.md и отчёты ревью. Где искать: KIT_REPOS="путь путь" или типовые папки.
 ROOTS="${KIT_REPOS:-$HOME/source $HOME/Projects $HOME/projects $HOME/dev $HOME/code $HOME/work $HOME/Documents}"
-REPOS=0; WITH=0; REPORTS=0; LAST=""
-for root in $ROOTS; do [ -d "$root" ] || continue
-  for g in $(find "$root" -maxdepth 3 -name .git -type d 2>/dev/null); do r=$(dirname "$g"); REPOS=$((REPOS+1))
-    [ -f "$r/CLAUDE.md" ] || [ -f "$r/AGENTS.md" ] && WITH=$((WITH+1))
-    for f in "$r"/out/reports/*review*.md; do [ -f "$f" ] || continue; REPORTS=$((REPORTS+1)); [ -z "$LAST" ] || [ "$f" -nt "$LAST" ] && LAST="$f"; done
-  done
+REPOS=0; WITH=0; REPORTS=0; LAST=""; GITS=$(mktemp)
+for root in $ROOTS; do
+  case "$root" in "~/"*) root="$HOME/${root#\~/}";; "~") root="$HOME";; esac   # ~ в переменной сам не раскрывается
+  [ -d "$root" ] && find "$root" -maxdepth 3 -name .git -type d 2>/dev/null >> "$GITS"
 done
+while IFS= read -r g; do r=$(dirname "$g"); REPOS=$((REPOS+1))   # построчно: пути с пробелами целы
+  if [ -f "$r/CLAUDE.md" ] || [ -f "$r/AGENTS.md" ]; then WITH=$((WITH+1)); fi
+  for f in "$r"/out/reports/*review*.md; do [ -f "$f" ] || continue; REPORTS=$((REPORTS+1)); if [ -z "$LAST" ] || [ "$f" -nt "$LAST" ]; then LAST="$f"; fi; done
+done < "$GITS"; rm -f "$GITS"
 if [ "$REPOS" -eq 0 ]; then warn "рабочих репо не найдено (укажи: KIT_REPOS=\"путь1 путь2\" sh doctor.sh). Без локального репо review.sh и правила проекта не работают"
 else
   [ "$WITH" -eq "$REPOS" ] && ok "CLAUDE.md/AGENTS.md во всех $REPOS репо" || warn "правила проекта есть в $WITH из $REPOS репо (шаблон: rules/CLAUDE.project.md)"

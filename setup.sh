@@ -73,11 +73,18 @@ mkdir -p "$HOME/.claude/skills" "$HOME/.claude/commands"
 link_skill() { # link_skill <каталог скилов> <метка>
   for s in "$KIT"/skills/*/; do
     name=$(basename "$s"); dst="$1/$name"
-    if [ -f "$dst/SKILL.md" ]; then say "  скил $name уже есть ($2) — пропускаю"; continue; fi
-    [ -L "$dst" ] && rm -f "$dst"   # битая ссылка от прошлой установки
-    ln -s "$KIT/skills/$name" "$dst" 2>/dev/null
-    if [ -f "$dst/SKILL.md" ]; then say "✓ скил $name → симлинк ($2)"
-    else rm -rf "$dst" 2>/dev/null; cp -R "$KIT/skills/$name" "$dst" && say "✓ скил $name → копия ($2; симлинки тут не работают — после git pull повтори setup.sh)"; fi
+    if [ -L "$dst" ] && [ -f "$dst/SKILL.md" ]; then say "  скил $name уже есть ($2) — пропускаю"; continue; fi
+    if [ -L "$dst" ]; then rm -f "$dst"                      # битая ссылка от прошлой установки
+    elif [ -f "$dst/.from-ai-starter-kit" ]; then            # наша же копия → обновляем, старую в бэкап
+      if diff -rq -x .from-ai-starter-kit "$KIT/skills/$name" "$dst" >/dev/null 2>&1; then say "  скил $name актуален ($2)"; continue; fi
+      mv "$dst" "$dst.$STAMP.bak"; say "  скил $name обновляю ($2; старая копия — $name.$STAMP.bak)"
+    elif [ -e "$dst" ]; then say "  скил $name ($2): каталог уже есть и поставлен не этим установщиком — не трогаю. Чтобы обновить из кита: переименуй его и повтори setup.sh"; continue; fi
+    if ln -s "$KIT/skills/$name" "$dst" 2>/dev/null && [ -f "$dst/SKILL.md" ]; then say "✓ скил $name → симлинк ($2)"
+    else
+      [ -L "$dst" ] && rm -f "$dst"
+      if cp -R "$KIT/skills/$name" "$dst" && : > "$dst/.from-ai-starter-kit"; then say "✓ скил $name → копия ($2; симлинки тут не работают — после git pull повтори setup.sh)"
+      else say "✗ скил $name не установился ($2)"; fi
+    fi
   done
 }
 link_skill "$HOME/.claude/skills" "Claude"
