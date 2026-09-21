@@ -52,10 +52,11 @@ def ensure(event, matcher, cmd):
                 r.setdefault("hooks", []).append({"type": "command", "command": cmd})
             return
     rules.append({"matcher": matcher, "hooks": [{"type": "command", "command": cmd}]})
-ensure("PreToolUse", "Bash", f"{home}/.claude/hooks/guard-bash.sh")
+q = lambda p: f'"{p}"' if " " in p else p   # путь с пробелами → в кавычках, иначе хук не запустится
+ensure("PreToolUse", "Bash", q(f"{home}/.claude/hooks/guard-bash.sh"))
 if os.environ.get("INSTALL_POST", "n").lower() == "y":
-    ensure("PostToolUse", "Edit|Write", f"{home}/.claude/hooks/format.sh")
-    ensure("PostToolUse", "Edit|Write", f"{home}/.claude/hooks/check.sh")
+    ensure("PostToolUse", "Edit|Write", q(f"{home}/.claude/hooks/format.sh"))
+    ensure("PostToolUse", "Edit|Write", q(f"{home}/.claude/hooks/check.sh"))
     extra = " + автоформат/проверка типов"
 else:
     extra = "; автоформат/проверка типов НЕ включены"
@@ -79,9 +80,9 @@ link_skill() { # link_skill <каталог скилов> <метка>
       if diff -rq -x .from-ai-starter-kit "$KIT/skills/$name" "$dst" >/dev/null 2>&1; then say "  скил $name актуален ($2)"; continue; fi
       mv "$dst" "$dst.$STAMP.bak"; say "  скил $name обновляю ($2; старая копия — $name.$STAMP.bak)"
     elif [ -e "$dst" ]; then say "  скил $name ($2): каталог уже есть и поставлен не этим установщиком — не трогаю. Чтобы обновить из кита: переименуй его и повтори setup.sh"; continue; fi
-    if ln -s "$KIT/skills/$name" "$dst" 2>/dev/null && [ -f "$dst/SKILL.md" ]; then say "✓ скил $name → симлинк ($2)"
+    if ln -s "$KIT/skills/$name" "$dst" 2>/dev/null && [ -L "$dst" ] && [ -f "$dst/SKILL.md" ]; then say "✓ скил $name → симлинк ($2)"
     else
-      [ -L "$dst" ] && rm -f "$dst"
+      if [ -L "$dst" ]; then rm -f "$dst"; elif [ -d "$dst" ]; then rm -rf "$dst"; fi   # MSYS deepcopy: ln «успешно» делает копию без маркера — её создали мы только что
       tmpd="$1/.$name.tmp.$$"; rm -rf "$tmpd"   # копируем во временный каталог с маркером, потом переносим целиком
       if cp -R "$KIT/skills/$name" "$tmpd" && : > "$tmpd/.from-ai-starter-kit" && mv "$tmpd" "$dst"; then
         say "✓ скил $name → копия ($2; симлинки тут не работают — после git pull повтори setup.sh)"
