@@ -52,7 +52,8 @@ def ensure(event, matcher, cmd):
                 r.setdefault("hooks", []).append({"type": "command", "command": cmd})
             return
     rules.append({"matcher": matcher, "hooks": [{"type": "command", "command": cmd}]})
-q = lambda p: f'"{p}"' if " " in p else p   # путь с пробелами → в кавычках, иначе хук не запустится
+import shlex
+q = shlex.quote   # пробелы, $ и кавычки в пути домашней папки не должны ломать или исполняться
 ensure("PreToolUse", "Bash", q(f"{home}/.claude/hooks/guard-bash.sh"))
 if os.environ.get("INSTALL_POST", "n").lower() == "y":
     ensure("PostToolUse", "Edit|Write", q(f"{home}/.claude/hooks/format.sh"))

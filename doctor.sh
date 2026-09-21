@@ -28,7 +28,7 @@ for r in d.get("hooks", {}).get("PreToolUse", []):
         except ValueError: continue
         # допускаем «путь» или «sh|bash путь»; путь должен быть ровно установленным файлом
         if parts and parts[0] in ("sh", "bash"): parts = parts[1:]
-        if len(parts) == 1 and os.path.realpath(os.path.expanduser(parts[0])) == want and os.path.isfile(want): sys.exit(0)
+        if len(parts) == 1 and os.path.isabs(parts[0]) and os.path.realpath(parts[0]) == want and os.path.isfile(want): sys.exit(0)
 sys.exit(1)
 PY
 then ok "хук прописан в settings.json → PreToolUse, matcher Bash"; else bad "guard-хук не прописан на Bash в ~/.claude/settings.json (или JSON битый): sh setup.sh"; fi
