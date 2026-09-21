@@ -52,7 +52,8 @@ else warn "нет ~/ai-workspace"; fi
 # репо: CLAUDE.md и отчёты ревью. Где искать: KIT_REPOS="путь путь" или типовые папки.
 # Корни: KIT_REPOS — пути через двоеточие (как PATH), иначе типовые папки. Пробелы в путях допустимы.
 REPOS=0; WITH=0; REPORTS=0; LAST=""; GITS=$(mktemp)
-scan_root() { r="$1"; case "$r" in "~/"*) r="$HOME/${r#\~/}";; "~") r="$HOME";; esac   # ~ в переменной сам не раскрывается
+scan_root() { r="$1"; case "$r" in [A-Za-z]) echo "⚠ KIT_REPOS: путь вида C:/... не подходит (двоеточие — разделитель). В Git Bash пиши /c/Users/...:/d/src"; W=$((W+1)); return;; esac
+  case "$r" in "~/"*) r="$HOME/${r#\~/}";; "~") r="$HOME";; esac   # ~ в переменной сам не раскрывается
   [ -d "$r" ] && find "$r" -maxdepth 3 -name .git -type d 2>/dev/null >> "$GITS"; }
 if [ -n "${KIT_REPOS:-}" ]; then OLDIFS=$IFS; IFS=:; for root in $KIT_REPOS; do IFS=$OLDIFS; scan_root "$root"; IFS=:; done; IFS=$OLDIFS
 else for d in source Projects projects dev code work Documents; do scan_root "$HOME/$d"; done; fi
