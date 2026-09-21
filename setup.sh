@@ -69,15 +69,19 @@ PY
 
 # 3. Скилы и команды
 mkdir -p "$HOME/.claude/skills" "$HOME/.claude/commands"
-for s in "$KIT"/skills/*/; do
-  name=$(basename "$s")
-  if [ -e "$HOME/.claude/skills/$name" ]; then
-    say "  скил $name уже есть — пропускаю"
-  else
-    ln -s "$KIT/skills/$name" "$HOME/.claude/skills/$name"
-    say "✓ скил $name → симлинк в ~/.claude/skills/"
-  fi
-done
+# Симлинк, а где он не работает (Windows без developer mode — ссылка создаётся «пустышкой») — копия.
+link_skill() { # link_skill <каталог скилов> <метка>
+  for s in "$KIT"/skills/*/; do
+    name=$(basename "$s"); dst="$1/$name"
+    if [ -f "$dst/SKILL.md" ]; then say "  скил $name уже есть ($2) — пропускаю"; continue; fi
+    [ -L "$dst" ] && rm -f "$dst"   # битая ссылка от прошлой установки
+    ln -s "$KIT/skills/$name" "$dst" 2>/dev/null
+    if [ -f "$dst/SKILL.md" ]; then say "✓ скил $name → симлинк ($2)"
+    else rm -rf "$dst" 2>/dev/null; cp -R "$KIT/skills/$name" "$dst" && say "✓ скил $name → копия ($2; симлинки тут не работают — после git pull повтори setup.sh)"; fi
+  done
+}
+link_skill "$HOME/.claude/skills" "Claude"
+if [ -d "$HOME/.codex" ]; then mkdir -p "$HOME/.codex/skills"; link_skill "$HOME/.codex/skills" "Codex"; fi
 for c in "$KIT"/commands/*.md; do
   name=$(basename "$c")
   dst="$HOME/.claude/commands/$name"
@@ -160,5 +164,6 @@ say "1. Заполни правила: возьми rules/CLAUDE.global.md, со
 say "   (для Codex тот же текст в ~/.codex/AGENTS.md). В код-репо — rules/CLAUDE.project.md."
 say "2. MCP context7/playwright: сниппеты в mcp/README.md."
 say "3. Кросс-ревью: из корня код-репо  sh $KIT/review/review.sh codex"
+say "   Самопроверка в любой момент: sh $KIT/doctor.sh — что стоит и чем реально пользуешься."
 say "4. Перезапусти Claude Code, чтобы подхватились хуки и скилы."
 say "5. Через пару дней работы скажи Claude: /kit-feedback — он соберёт, что сошлось и что нет; файл скинь владельцу кита."
