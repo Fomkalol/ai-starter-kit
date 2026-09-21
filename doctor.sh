@@ -15,7 +15,7 @@ H="$HOME/.claude/hooks/guard-bash.sh"
 if [ ! -f "$H" ]; then bad "нет $H — запусти setup.sh"
 elif ! cmp -s "$H" "$KIT/hooks/guard-bash.sh"; then warn "guard-bash.sh отличается от версии кита (обнови: sh setup.sh)"
 else ok "guard-хук на месте и совпадает с китом"; fi
-if python3 -c 'import json,sys,os; d=json.load(open(os.path.expanduser("~/.claude/settings.json"))); sys.exit(0 if any(r.get("matcher","") in ("Bash","*","") or "Bash" in r.get("matcher","").split("|") for r in d.get("hooks",{}).get("PreToolUse",[]) for h in r.get("hooks",[]) if h.get("type","command")=="command" and h.get("command","").strip().endswith("guard-bash.sh")) else 1)' 2>/dev/null
+if python3 -c 'import json,sys,os; d=json.load(open(os.path.expanduser("~/.claude/settings.json"))); sys.exit(0 if any(r.get("matcher","") in ("Bash","*","") or "Bash" in r.get("matcher","").split("|") for r in d.get("hooks",{}).get("PreToolUse",[]) for h in r.get("hooks",[]) if h.get("type","command")=="command" and h.get("command","").strip().strip("\"\x27").endswith("guard-bash.sh")) else 1)' 2>/dev/null
 then ok "хук прописан в settings.json → PreToolUse, matcher Bash"; else bad "guard-хук не прописан на Bash в ~/.claude/settings.json (или JSON битый): sh setup.sh"; fi
 # скилы и команды
 for s in "$KIT"/skills/*/; do n=$(basename "$s")
@@ -50,17 +50,17 @@ if [ -d "$WS" ]; then
   N=$(find "$WS/handoffs" -name '*.md' ! -name '*template*' 2>/dev/null | wc -l | tr -d ' '); [ "$N" -gt 0 ] && ok "хендоффов: $N" || warn "хендоффов нет (команда /handoff перед сменой сессии)"
 else warn "нет ~/ai-workspace"; fi
 # репо: CLAUDE.md и отчёты ревью. Где искать: KIT_REPOS="путь путь" или типовые папки.
-ROOTS="${KIT_REPOS:-$HOME/source $HOME/Projects $HOME/projects $HOME/dev $HOME/code $HOME/work $HOME/Documents}"
+# Корни: KIT_REPOS — пути через двоеточие (как PATH), иначе типовые папки. Пробелы в путях допустимы.
 REPOS=0; WITH=0; REPORTS=0; LAST=""; GITS=$(mktemp)
-for root in $ROOTS; do
-  case "$root" in "~/"*) root="$HOME/${root#\~/}";; "~") root="$HOME";; esac   # ~ в переменной сам не раскрывается
-  [ -d "$root" ] && find "$root" -maxdepth 3 -name .git -type d 2>/dev/null >> "$GITS"
-done
+scan_root() { r="$1"; case "$r" in "~/"*) r="$HOME/${r#\~/}";; "~") r="$HOME";; esac   # ~ в переменной сам не раскрывается
+  [ -d "$r" ] && find "$r" -maxdepth 3 -name .git -type d 2>/dev/null >> "$GITS"; }
+if [ -n "${KIT_REPOS:-}" ]; then OLDIFS=$IFS; IFS=:; for root in $KIT_REPOS; do IFS=$OLDIFS; scan_root "$root"; IFS=:; done; IFS=$OLDIFS
+else for d in source Projects projects dev code work Documents; do scan_root "$HOME/$d"; done; fi
 while IFS= read -r g; do r=$(dirname "$g"); REPOS=$((REPOS+1))   # построчно: пути с пробелами целы
   if [ -f "$r/CLAUDE.md" ] || [ -f "$r/AGENTS.md" ]; then WITH=$((WITH+1)); fi
   for f in "$r"/out/reports/*review*.md; do [ -f "$f" ] || continue; REPORTS=$((REPORTS+1)); if [ -z "$LAST" ] || [ "$f" -nt "$LAST" ]; then LAST="$f"; fi; done
 done < "$GITS"; rm -f "$GITS"
-if [ "$REPOS" -eq 0 ]; then warn "рабочих репо не найдено (укажи: KIT_REPOS=\"путь1 путь2\" sh doctor.sh). Без локального репо review.sh и правила проекта не работают"
+if [ "$REPOS" -eq 0 ]; then warn "рабочих репо не найдено (укажи: KIT_REPOS=\"путь1:путь2\" sh doctor.sh). Без локального репо review.sh и правила проекта не работают"
 else
   [ "$WITH" -eq "$REPOS" ] && ok "CLAUDE.md/AGENTS.md во всех $REPOS репо" || warn "правила проекта есть в $WITH из $REPOS репо (шаблон: rules/CLAUDE.project.md)"
   [ "$REPORTS" -gt 0 ] && ok "отчётов кросс-ревью: $REPORTS, последний: $LAST" || warn "отчётов review.sh нет ни в одном репо — кросс-ревью второй моделью не запускалось"

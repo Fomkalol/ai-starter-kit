@@ -42,7 +42,7 @@ sh ~/ai-starter-kit/doctor.sh
 
 Две части: «Установка» (хук, скилы, команды, правила, claude/codex в PATH, версия кита против GitHub) и
 «Использование» (ведутся ли TASKS/память/хендоффы, в скольких репо есть CLAUDE.md, запускалось ли кросс-ревью).
-Репо ищет в типовых папках; свои пути: `KIT_REPOS="~/work ~/src" sh doctor.sh`.
+Репо ищет в типовых папках; свои пути: `KIT_REPOS="~/work:~/src" sh doctor.sh` (через двоеточие).
 
 **Codex.** `setup.sh` кладёт команды в `~/.codex/prompts` и скилы в `~/.codex/skills`. Защитный guard-хук работает
 только в Claude Code; в Codex его нет — держи Codex в песочнице, без full-access на машинах с ключами.

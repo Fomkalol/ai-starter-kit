@@ -82,13 +82,20 @@ link_skill() { # link_skill <каталог скилов> <метка>
     if ln -s "$KIT/skills/$name" "$dst" 2>/dev/null && [ -f "$dst/SKILL.md" ]; then say "✓ скил $name → симлинк ($2)"
     else
       [ -L "$dst" ] && rm -f "$dst"
-      if cp -R "$KIT/skills/$name" "$dst" && : > "$dst/.from-ai-starter-kit"; then say "✓ скил $name → копия ($2; симлинки тут не работают — после git pull повтори setup.sh)"
-      else say "✗ скил $name не установился ($2)"; fi
+      tmpd="$1/.$name.tmp.$$"; rm -rf "$tmpd"   # копируем во временный каталог с маркером, потом переносим целиком
+      if cp -R "$KIT/skills/$name" "$tmpd" && : > "$tmpd/.from-ai-starter-kit" && mv "$tmpd" "$dst"; then
+        say "✓ скил $name → копия ($2; симлинки тут не работают — после git pull повтори setup.sh)"
+      else
+        rm -rf "$tmpd"; [ -d "$dst.$STAMP.bak" ] && [ ! -e "$dst" ] && mv "$dst.$STAMP.bak" "$dst"
+        say "✗ скил $name не установился ($2)"; SKILL_FAIL=1
+      fi
     fi
   done
 }
+SKILL_FAIL=0
 link_skill "$HOME/.claude/skills" "Claude"
 if [ -d "$HOME/.codex" ]; then mkdir -p "$HOME/.codex/skills"; link_skill "$HOME/.codex/skills" "Codex"; fi
+[ "$SKILL_FAIL" = 0 ] || { say "✗ часть скилов не установилась (см. выше) — установка остановлена"; exit 1; }
 for c in "$KIT"/commands/*.md; do
   name=$(basename "$c")
   dst="$HOME/.claude/commands/$name"
