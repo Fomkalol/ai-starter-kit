@@ -45,17 +45,21 @@ hooks = data.setdefault("hooks", {})
 home = os.path.expanduser("~")
 def ensure(event, matcher, cmd):
     rules = hooks.setdefault(event, [])
-    # прежние версии писали тот же путь без кавычек или в двойных — убираем эти дубли, чужие команды не трогаем
-    raw = shlex.split(cmd)[0]; stale = {raw, f'"{raw}"'} - {cmd}
+    raw = shlex.split(cmd)[0]; same = {raw, f'"{raw}"', cmd}   # все написания одного и того же хука
+    found = False
+    for r in rules:
+        if r.get("matcher") != matcher: continue
+        kept = []
+        for h in r.get("hooks", []):
+            if h.get("command") in same:
+                if found: continue            # дубль в этом или другом правиле — убираем
+                h["command"] = cmd; found = True   # нормализуем написание, остальные поля (timeout и т.п.) не трогаем
+            kept.append(h)
+        r["hooks"] = kept
+    if found: return
     for r in rules:
         if r.get("matcher") == matcher:
-            r["hooks"] = [h for h in r.get("hooks", []) if h.get("command") not in stale]
-    for r in rules:
-        if r.get("matcher") == matcher:
-            cmds = [h.get("command") for h in r.get("hooks", [])]
-            if cmd not in cmds:
-                r.setdefault("hooks", []).append({"type": "command", "command": cmd})
-            return
+            r.setdefault("hooks", []).append({"type": "command", "command": cmd}); return
     rules.append({"matcher": matcher, "hooks": [{"type": "command", "command": cmd}]})
 q = shlex.quote   # пробелы, $ и кавычки в пути домашней папки не должны ломать или исполняться
 ensure("PreToolUse", "Bash", q(f"{home}/.claude/hooks/guard-bash.sh"))
