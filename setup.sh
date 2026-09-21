@@ -30,7 +30,7 @@ fi
 
 # 2. Хуки в settings.json (аккуратный merge с бэкапом)
 INSTALL_POST="$hooks_ans" STAMP="$STAMP" python3 - "$HOME/.claude/settings.json" <<'PY'
-import json, os, sys, tempfile
+import json, os, shlex, sys, tempfile
 path = sys.argv[1]
 os.makedirs(os.path.dirname(path), exist_ok=True)
 data = {}
@@ -45,6 +45,11 @@ hooks = data.setdefault("hooks", {})
 home = os.path.expanduser("~")
 def ensure(event, matcher, cmd):
     rules = hooks.setdefault(event, [])
+    # прежние версии писали тот же путь без кавычек или в двойных — убираем эти дубли, чужие команды не трогаем
+    raw = shlex.split(cmd)[0]; stale = {raw, f'"{raw}"'} - {cmd}
+    for r in rules:
+        if r.get("matcher") == matcher:
+            r["hooks"] = [h for h in r.get("hooks", []) if h.get("command") not in stale]
     for r in rules:
         if r.get("matcher") == matcher:
             cmds = [h.get("command") for h in r.get("hooks", [])]
@@ -52,7 +57,6 @@ def ensure(event, matcher, cmd):
                 r.setdefault("hooks", []).append({"type": "command", "command": cmd})
             return
     rules.append({"matcher": matcher, "hooks": [{"type": "command", "command": cmd}]})
-import shlex
 q = shlex.quote   # пробелы, $ и кавычки в пути домашней папки не должны ломать или исполняться
 ensure("PreToolUse", "Bash", q(f"{home}/.claude/hooks/guard-bash.sh"))
 if os.environ.get("INSTALL_POST", "n").lower() == "y":
